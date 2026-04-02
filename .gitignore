@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Env
+venv/
+.env/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Data
+data/
+*.json
+
+# Model files
+*.pkl
+*.onnx
+
+# Node (future frontend)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
