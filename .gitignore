@@ -3,28 +3,53 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.python-version
 
 # Virtual Env
+.venv/
 venv/
-.env/
+
+# Environment variables
+.env
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Logs
 *.log
 
 # Data
 data/
-*.json
 
 # Model files
 *.pkl
 *.onnx
 
-# Node (future frontend)
+# Node (frontend)
 node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Docker
+docker-compose.override.yml
 
 # IDE
 .vscode/
 .idea/
+
+# Notebooks
+notebooks/.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Test cache
+.pytest_cache/
+htmlcov/
+.coverage
+
+# uv
+uv.lock
+pyproject.toml
