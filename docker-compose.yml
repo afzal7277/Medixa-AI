@@ -78,6 +78,10 @@ services:
         condition: service_started
     env_file:
       - .env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     restart: on-failure
     volumes:
       - model-cache:/root/.cache/huggingface
@@ -96,11 +100,13 @@ services:
     env_file:
       - .env
     environment:
-      - MODEL_PATH=/app/model/severity_classifier.onnx
-      - LABEL_ENCODER_PATH=/app/model/label_encoder.json
-      - MIN_SAMPLES=500
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     volumes:
       - ml-model:/app/model
+      - model-cache:/root/.cache/huggingface
+    restart: on-failure
 
   ml-trainer:
     build: ./ml-service
@@ -113,12 +119,14 @@ services:
     env_file:
       - .env
     environment:
-      - MODEL_PATH=/app/model/severity_classifier.onnx
-      - LABEL_ENCODER_PATH=/app/model/label_encoder.json
-      - MIN_SAMPLES=500
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     volumes:
       - ml-model:/app/model
+      - model-cache:/root/.cache/huggingface
     command: ["python", "train.py"]
+    restart: on-failure
 
 
   api:

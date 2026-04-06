@@ -73,12 +73,24 @@
 - [x] Two sources: openfda_events + openfda_labels
 - [x] Old topic cleared, fresh data flowing
 
+- [x] Consumer running, processing raw_drug_events
+- [x] BioBERT embeddings generating on CPU
+- [x] CYP450 flags extracted from raw text
+- [x] Severity labels mapped from seriousness keywords
+- [x] Pair frequency tracked in Redis
+- [x] Delivering to processed_features topic
+
 ### Block 3 - ML Model
 - [ ] Data collection script pulling 5k records
 - [ ] XGBoost classifier trained
 - [ ] F1 >= 0.75 on held-out test set
 - [ ] ONNX export
 - [ ] /predict endpoint running
+
+- [x] ML model trained — 91% weighted F1
+- [x] XGBoost native model saved to disk
+- [x] ml-service /predict endpoint running on port 8001
+- [x] warfarin + aspirin → Severe (0.95 confidence)
 
 ### Block 4 - GenAI Layer
 - [ ] ChromaDB populated
