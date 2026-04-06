@@ -147,6 +147,7 @@ services:
       - model-cache:/root/.cache/huggingface
     restart: on-failure
 
+  
   api:
     build: ./api-gateway
     container_name: medixa-api
@@ -154,11 +155,16 @@ services:
       - "8000:8000"
     depends_on:
       - redis
-      - kafka
+      - ml-service
+      - genai-service
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ML_SERVICE_URL=http://ml-service:8001
+      - GENAI_SERVICE_URL=http://genai-service:8002
+    restart: on-failure
 
   frontend:
     build: ./frontend
