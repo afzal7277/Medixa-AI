@@ -1,3 +1,7 @@
 confluent-kafka==2.3.0
 requests==2.31.0
 python-dotenv==1.2.2
+sentence-transformers==2.7.0
+redis==5.0.1
+torch==2.3.0
+transformers==4.40.0

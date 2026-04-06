@@ -54,6 +54,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
 
+
   data-pipeline:
     build: ./data-pipeline
     container_name: medixa-pipeline
@@ -63,6 +64,62 @@ services:
     env_file:
       - .env
     restart: on-failure
+    volumes:
+      - model-cache:/root/.cache/huggingface
+
+
+  consumer:
+    build: ./data-pipeline
+    container_name: medixa-consumer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    restart: on-failure
+    volumes:
+      - model-cache:/root/.cache/huggingface
+    command: ["python", "consumer.py"]
+
+  ml-service:
+    build: ./ml-service
+    container_name: medixa-ml
+    ports:
+      - "8001:8001"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      - MODEL_PATH=/app/model/severity_classifier.onnx
+      - LABEL_ENCODER_PATH=/app/model/label_encoder.json
+      - MIN_SAMPLES=500
+    volumes:
+      - ml-model:/app/model
+
+  ml-trainer:
+    build: ./ml-service
+    container_name: medixa-trainer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      - MODEL_PATH=/app/model/severity_classifier.onnx
+      - LABEL_ENCODER_PATH=/app/model/label_encoder.json
+      - MIN_SAMPLES=500
+    volumes:
+      - ml-model:/app/model
+    command: ["python", "train.py"]
+
 
   api:
     build: ./api-gateway
@@ -87,8 +144,9 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000
 
-
-
+  
 volumes:
   grafana-data:
   kafka-data:
+  model-cache:
+  ml-model:

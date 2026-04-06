@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import signal
-import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -16,12 +15,11 @@ load_dotenv()
 # ── Config ────────────────────────────────────────────────────────────────────
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 OPENFDA_BASE_URL = os.getenv("OPENFDA_BASE_URL", "https://api.fda.gov/drug")
-PUBMED_BASE_URL = os.getenv("PUBMED_BASE_URL", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils")
-RXNORM_BASE_URL = os.getenv("RXNORM_BASE_URL", "https://rxnav.nlm.nih.gov/REST")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", 60))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))
 RETRY_DELAY = int(os.getenv("RETRY_DELAY", 5))
 TOPIC = "raw_drug_events"
+PAGE_SIZE = 100
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -30,7 +28,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Shutdown flag ─────────────────────────────────────────────────────────────
+# ── Shutdown ──────────────────────────────────────────────────────────────────
 shutdown = False
 
 def handle_shutdown(signum, frame):
@@ -42,10 +40,10 @@ signal.signal(signal.SIGTERM, handle_shutdown)
 signal.signal(signal.SIGINT, handle_shutdown)
 
 
-# ── HTTP base client ──────────────────────────────────────────────────────────
-class BaseClient:
-    def __init__(self, base_url: str):
-        self.base_url = base_url
+# ── Base HTTP client ──────────────────────────────────────────────────────────
+class OpenFDAClient:
+    def __init__(self):
+        self.base_url = OPENFDA_BASE_URL
         self.session = requests.Session()
 
     def get(self, path: str, params: dict = None) -> dict | None:
@@ -60,19 +58,19 @@ class BaseClient:
                     return None
                 elif resp.status_code == 429:
                     wait = RETRY_DELAY * attempt
-                    logger.warning(f"Rate limited on {url}. Waiting {wait}s")
+                    logger.warning(f"Rate limited. Waiting {wait}s")
                     time.sleep(wait)
                 else:
                     logger.error(f"HTTP {resp.status_code} for {url}")
                     return None
             except requests.exceptions.Timeout:
-                logger.error(f"Timeout on attempt {attempt} for {url}")
+                logger.error(f"Timeout attempt {attempt} for {url}")
                 time.sleep(RETRY_DELAY * attempt)
             except requests.exceptions.ConnectionError:
-                logger.error(f"Connection error on attempt {attempt} for {url}")
+                logger.error(f"Connection error attempt {attempt} for {url}")
                 time.sleep(RETRY_DELAY * attempt)
             except Exception as e:
-                logger.error(f"Unexpected error on attempt {attempt} for {url}: {e}")
+                logger.error(f"Unexpected error attempt {attempt} for {url}: {e}")
                 time.sleep(RETRY_DELAY * attempt)
         logger.error(f"All {MAX_RETRIES} attempts failed for {url}")
         return None
@@ -81,115 +79,165 @@ class BaseClient:
         self.session.close()
 
 
-# ── RxNorm client ─────────────────────────────────────────────────────────────
-class RxNormClient(BaseClient):
-    def __init__(self):
-        super().__init__(RXNORM_BASE_URL)
+# ── Events handler ────────────────────────────────────────────────────────────
+class EventsHandler:
+    def __init__(self, client: OpenFDAClient):
+        self.client = client
+        self.offset = 0
 
-    def get_drug_names(self, drug_class: str) -> list[str]:
-        data = self.get(f"/drugs.json", params={"name": drug_class})
+    def fetch_page(self) -> list[dict]:
+        data = self.client.get("/event.json", params={
+            "search": "serious:1",
+            "limit": PAGE_SIZE,
+            "skip": self.offset,
+        })
         if not data:
             return []
-        drugs = []
-        try:
-            drug_group = data.get("drugGroup", {}).get("conceptGroup", [])
-            for group in drug_group:
-                for concept in group.get("conceptProperties", []):
-                    name = concept.get("synonym") or concept.get("name")
-                    if name:
-                        drugs.append(name.lower())
-        except Exception as e:
-            logger.error(f"RxNorm parse error for {drug_class}: {e}")
-        return drugs
+        results = data.get("results", [])
+        self.offset += PAGE_SIZE
+        # reset offset after 10000 to stay within OpenFDA limits
+        if self.offset >= 10000:
+            self.offset = 0
+            logger.info("Offset reset to 0")
+        return results
 
-    def build_drug_pairs(self, drug_classes: list[str]) -> list[tuple[str, str]]:
-        all_drugs = []
-        for cls in drug_classes:
-            names = self.get_drug_names(cls)
-            logger.info(f"RxNorm: {len(names)} drugs found for class '{cls}'")
-            all_drugs.extend(names[:5])  # cap per class to avoid explosion
+    def extract_drug_pairs(self, report: dict) -> list[tuple[str, str]]:
+        drugs = report.get("patient", {}).get("drug", [])
+        suspect = []
+        interacting = []
+        concomitant = []
+
+        for drug in drugs:
+            characterization = str(drug.get("drugcharacterization", ""))
+            name = (
+                drug.get("activesubstance", {}).get("activesubstancename", "")
+                or drug.get("medicinalproduct", "")
+            ).lower().strip()
+
+            if not name or len(name) < 3:
+                continue
+
+            if characterization == "1":
+                suspect.append(name)
+            elif characterization == "3":
+                interacting.append(name)
+            elif characterization == "2":
+                concomitant.append(name)
 
         pairs = []
         seen = set()
-        for i in range(len(all_drugs)):
-            for j in range(i + 1, len(all_drugs)):
-                a, b = all_drugs[i], all_drugs[j]
+
+        # suspect + interacting pairs first (strongest signal)
+        for a in suspect:
+            for b in interacting:
                 key = tuple(sorted([a, b]))
                 if key not in seen:
                     seen.add(key)
                     pairs.append((a, b))
-        logger.info(f"RxNorm: built {len(pairs)} drug pairs")
+
+        # suspect + concomitant if no interacting drugs found
+        if not pairs:
+            for a in suspect:
+                for b in concomitant:
+                    key = tuple(sorted([a, b]))
+                    if key not in seen:
+                        seen.add(key)
+                        pairs.append((a, b))
+
         return pairs
 
-
-# ── OpenFDA client ────────────────────────────────────────────────────────────
-class OpenFDAClient(BaseClient):
-    def __init__(self):
-        super().__init__(OPENFDA_BASE_URL)
-
-    def fetch_adverse_events(self, drug_a: str, drug_b: str, limit: int = 10) -> list[dict]:
-        params = {
-            "search": f'patient.drug.medicinalproduct:"{drug_a}"+AND+patient.drug.medicinalproduct:"{drug_b}"',
-            "limit": limit,
-        }
-        data = self.get("/event.json", params=params)
-        if not data:
-            return []
-        return data.get("results", [])
-
-    def extract_raw_text(self, event: dict) -> str:
+    def build_raw_text(self, report: dict, drug_a: str, drug_b: str) -> str:
         parts = []
-        for drug in event.get("patient", {}).get("drug", []):
-            name = drug.get("medicinalproduct", "")
-            indication = drug.get("drugindication", "")
-            if name:
-                parts.append(f"{name}: {indication}")
+
         reactions = [
             r.get("reactionmeddrapt", "")
-            for r in event.get("patient", {}).get("reaction", [])
+            for r in report.get("patient", {}).get("reaction", [])
             if r.get("reactionmeddrapt")
         ]
         if reactions:
             parts.append("Reactions: " + ", ".join(reactions))
-        return " | ".join(parts)
+
+        for drug in report.get("patient", {}).get("drug", []):
+            name = (
+                drug.get("activesubstance", {}).get("activesubstancename", "")
+                or drug.get("medicinalproduct", "")
+            ).lower().strip()
+            indication = drug.get("drugindication", "").strip()
+            if name in (drug_a, drug_b) and indication:
+                parts.append(f"{name} indication: {indication}")
+
+        seriousness = []
+        if report.get("seriousnessdeath") == "1":
+            seriousness.append("death")
+        if report.get("seriousnesslifethreatening") == "1":
+            seriousness.append("life threatening")
+        if report.get("seriousnesshospitalization") == "1":
+            seriousness.append("hospitalization")
+        if report.get("seriousnessdisabling") == "1":
+            seriousness.append("disabling")
+        if report.get("seriousnesscongenitalanomali") == "1":
+            seriousness.append("congenital anomaly")
+        if report.get("seriousnessother") == "1":
+            seriousness.append("other serious condition")
+        if seriousness:
+            parts.append("Seriousness: " + ", ".join(seriousness))
+
+        lit = report.get("primarysource", {}).get("literaturereference", "")
+        if lit:
+            parts.append(f"Reference: {lit}")
+
+        return " | ".join(parts)[:2000]
 
 
-# ── PubMed client ─────────────────────────────────────────────────────────────
-class PubMedClient(BaseClient):
-    def __init__(self):
-        super().__init__(PUBMED_BASE_URL)
+# ── Labels handler ────────────────────────────────────────────────────────────
+class LabelsHandler:
+    def __init__(self, client: OpenFDAClient):
+        self.client = client
+        self.fetched = set()
 
-    def search_ids(self, drug_a: str, drug_b: str, max_results: int = 5) -> list[str]:
-        query = f"{drug_a} {drug_b} drug interaction"
-        data = self.get("/esearch.fcgi", params={
-            "db": "pubmed",
-            "term": query,
-            "retmax": max_results,
-            "retmode": "json",
+    def fetch_label(self, drug_a: str, drug_b: str) -> str | None:
+        cache_key = tuple(sorted([drug_a, drug_b]))
+        if cache_key in self.fetched:
+            return None
+        self.fetched.add(cache_key)
+
+        data = self.client.get("/label.json", params={
+            "search": f'openfda.substance_name:"{drug_a}"',
+            "limit": 1,
         })
         if not data:
-            return []
-        return data.get("esearchresult", {}).get("idlist", [])
+            return None
 
-    def fetch_abstract(self, pmid: str) -> str:
-        data = self.get("/efetch.fcgi", params={
-            "db": "pubmed",
-            "id": pmid,
-            "rettype": "abstract",
-            "retmode": "text",
-        })
-        if not data:
-            return ""
-        return str(data)[:1000]  # cap at 1000 chars
+        try:
+            result = data.get("results", [])[0]
+            parts = []
+
+            interactions = result.get("drug_interactions", [])
+            if interactions:
+                parts.append("Drug interactions: " + " ".join(interactions)[:800])
+
+            warnings = result.get("warnings", [])
+            if warnings:
+                parts.append("Warnings: " + " ".join(warnings)[:400])
+
+            boxed = result.get("boxed_warning", [])
+            if boxed:
+                parts.append("Boxed warning: " + " ".join(boxed)[:400])
+
+            return " | ".join(parts) if parts else None
+        except (IndexError, Exception) as e:
+            logger.error(f"Label parse error for {drug_a}: {e}")
+            return None
 
 
-# ── Kafka producer ────────────────────────────────────────────────────────────
+# ── Kafka producer client ─────────────────────────────────────────────────────
 class KafkaProducerClient:
     def __init__(self):
         self.producer = Producer({
             "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
             "retries": MAX_RETRIES,
-            "retry.backoff.ms": RETRY_DELAY * 1000,
+            "retry.backoff.ms": 1000,
+            "retry.backoff.max.ms": 5000,
         })
 
     def delivery_report(self, err, msg):
@@ -229,68 +277,57 @@ def build_event(drug_a: str, drug_b: str, source: str, raw_text: str) -> dict:
     }
 
 
-# ── Drug classes for RxNorm discovery ────────────────────────────────────────
-DRUG_CLASSES = [
-    "warfarin", "aspirin", "metformin", "lisinopril",
-    "atorvastatin", "amoxicillin", "ibuprofen", "omeprazole",
-    "metoprolol", "amlodipine",
-]
-
-
 # ── Main loop ─────────────────────────────────────────────────────────────────
 def run():
-    rxnorm = RxNormClient()
-    openfda = OpenFDAClient()
-    pubmed = PubMedClient()
+    client = OpenFDAClient()
+    events_handler = EventsHandler(client)
+    labels_handler = LabelsHandler(client)
     kafka = KafkaProducerClient()
 
     logger.info("Producer started")
 
     try:
         while not shutdown:
-            logger.info("Starting poll cycle")
+            logger.info(f"Starting poll cycle — offset={events_handler.offset}")
 
-            pairs = rxnorm.build_drug_pairs(DRUG_CLASSES)
-            if not pairs:
-                logger.warning("No drug pairs discovered from RxNorm, retrying next cycle")
+            reports = events_handler.fetch_page()
+            if not reports:
+                logger.warning("No reports fetched, sleeping")
                 time.sleep(POLL_INTERVAL)
                 continue
 
-            for drug_a, drug_b in pairs:
+            logger.info(f"Fetched {len(reports)} reports")
+            published = 0
+
+            for report in reports:
                 if shutdown:
                     break
 
-                # OpenFDA
-                try:
-                    events = openfda.fetch_adverse_events(drug_a, drug_b)
-                    for event in events:
-                        raw_text = openfda.extract_raw_text(event)
-                        if raw_text:
-                            kafka.publish(build_event(drug_a, drug_b, "openfda", raw_text))
-                except Exception as e:
-                    logger.error(f"OpenFDA error for {drug_a}+{drug_b}: {e}")
+                pairs = events_handler.extract_drug_pairs(report)
+                if not pairs:
+                    continue
 
-                # PubMed
-                try:
-                    pmids = pubmed.search_ids(drug_a, drug_b)
-                    for pmid in pmids:
-                        abstract = pubmed.fetch_abstract(pmid)
-                        if abstract:
-                            kafka.publish(build_event(drug_a, drug_b, "pubmed", abstract))
-                        time.sleep(0.4)  # respect 3 req/sec free tier
-                except Exception as e:
-                    logger.error(f"PubMed error for {drug_a}+{drug_b}: {e}")
+                for drug_a, drug_b in pairs:
+                    # adverse event
+                    raw_text = events_handler.build_raw_text(report, drug_a, drug_b)
+                    if raw_text:
+                        kafka.publish(build_event(drug_a, drug_b, "openfda_events", raw_text))
+                        published += 1
 
-                time.sleep(1)  # be polite to APIs
+                    # label for drug_a
+                    label_text = labels_handler.fetch_label(drug_a, drug_b)
+                    if label_text:
+                        kafka.publish(build_event(drug_a, drug_b, "openfda_labels", label_text))
+                        published += 1
+
+                    time.sleep(0.5)
 
             kafka.flush()
-            logger.info(f"Cycle complete. Sleeping {POLL_INTERVAL}s")
+            logger.info(f"Cycle complete. Published {published} events. Sleeping {POLL_INTERVAL}s")
             time.sleep(POLL_INTERVAL)
 
     finally:
-        rxnorm.close()
-        openfda.close()
-        pubmed.close()
+        client.close()
         kafka.close()
         logger.info("Producer shut down cleanly")
 
