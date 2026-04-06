@@ -129,6 +129,24 @@ services:
     restart: on-failure
 
 
+  genai-service:
+    build: ./genai-service
+    container_name: medixa-genai
+    ports:
+      - "8002:8002"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - CHROMA_PATH=/app/chromadb
+    volumes:
+      - chroma-data:/app/chromadb
+      - model-cache:/root/.cache/huggingface
+    restart: on-failure
+
   api:
     build: ./api-gateway
     container_name: medixa-api
@@ -158,3 +176,4 @@ volumes:
   kafka-data:
   model-cache:
   ml-model:
+  chroma-data:
