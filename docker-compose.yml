@@ -68,7 +68,8 @@ services:
     restart: on-failure
     volumes:
       - model-cache:/root/.cache/huggingface
-
+    ports:
+      - "9103:8003"
 
   consumer:
     build: ./data-pipeline
@@ -88,6 +89,8 @@ services:
     volumes:
       - model-cache:/root/.cache/huggingface
     command: ["python", "consumer.py"]
+    ports:
+      - "9104:8004"
 
   ml-service:
     build: ./ml-service

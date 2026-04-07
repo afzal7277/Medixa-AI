@@ -13,3 +13,19 @@ scrape_configs:
   - job_name: 'genai-service'
     static_configs:
       - targets: ['genai-service:8002']
+
+  - job_name: 'data-pipeline-producer'
+    static_configs:
+      - targets: ['data-pipeline:8003']
+
+  - job_name: 'data-pipeline-consumer'
+    static_configs:
+      - targets: ['consumer:8004']
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']

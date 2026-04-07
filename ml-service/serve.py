@@ -8,6 +8,7 @@ import redis
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from prometheus_client import Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from sentence_transformers import SentenceTransformer
 
@@ -29,6 +30,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Medixa ML Service")
+
+ml_inference_latency_ms = Histogram(
+    "ml_inference_latency_ms",
+    "Time taken by ML model to classify severity",
+    ["model"],
+    buckets=[10, 50, 100, 250, 500, 1000, 2000, 5000],
+)
+ml_model_confidence = Histogram(
+    "ml_model_confidence",
+    "ML model confidence scores",
+    ["model"],
+    buckets=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+)
+
 Instrumentator().instrument(app).expose(app)
 
 
@@ -182,7 +197,11 @@ def predict(req: PredictRequest):
             dtype=np.float32,
         ).reshape(1, -1)
 
+        start_time = time.time()
         severity, confidence = model_service.predict(features)
+        duration_ms = (time.time() - start_time) * 1000
+        ml_inference_latency_ms.labels(model="severity_classifier").observe(duration_ms)
+        ml_model_confidence.labels(model="severity_classifier").observe(confidence)
 
         logger.info(f"Predicted {drug_a}+{drug_b} -> {severity} ({confidence:.3f}) freq={pair_frequency} cyp450={cyp450_flag}")
 

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import uuid
 from typing import AsyncGenerator
 
@@ -9,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
+from prometheus_client import Gauge
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
@@ -29,6 +31,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Medixa GenAI Service")
+
+llm_time_to_first_token_ms = Gauge(
+    "llm_time_to_first_token_ms",
+    "Latency until first streaming token arrives",
+    ["handler"],
+)
+llm_tokens_per_second = Gauge(
+    "llm_tokens_per_second",
+    "Generated tokens per second for LLM streaming responses",
+    ["handler"],
+)
+
 Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
@@ -115,10 +129,23 @@ async def stream_explanation(
             temperature=0.3,
         )
 
+        start_time = time.time()
+        first_token_recorded = False
+        token_count = 0
+
         async for chunk in stream:
             delta = chunk.choices[0].delta.content
             if delta:
+                if not first_token_recorded:
+                    first_token_ms = (time.time() - start_time) * 1000
+                    llm_time_to_first_token_ms.labels(handler="explain").set(first_token_ms)
+                    first_token_recorded = True
+                token_count += len(delta.split())
                 yield f"data: {json.dumps({'type': 'token', 'data': delta})}\n\n"
+
+        elapsed = time.time() - start_time
+        if elapsed > 0:
+            llm_tokens_per_second.labels(handler="explain").set(token_count / elapsed)
 
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         logger.info(f"[{trace_id}] Stream complete for {drug_a}+{drug_b}")
@@ -206,6 +233,3 @@ def health():
     }
 
 
-@app.get("/metrics")
-def metrics_info():
-    return {"status": "ok"}

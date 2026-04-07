@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import redis
 from confluent_kafka import Consumer, KafkaError, Producer
 from dotenv import load_dotenv
+from prometheus_client import Counter, Gauge, start_http_server
 from sentence_transformers import SentenceTransformer
 
 load_dotenv()
@@ -154,6 +155,18 @@ class KafkaConsumerClient:
         self.consumer.subscribe([INPUT_TOPIC])
         logger.info(f"Subscribed to {INPUT_TOPIC}")
 
+        self.pipeline_consumer_lag = Gauge(
+            "pipeline_consumer_lag",
+            "Kafka consumer lag for raw drug events",
+            ["topic", "group"],
+        )
+
+        self.pipeline_processed_events_total = Counter(
+            "pipeline_processed_events_total",
+            "Count of pipeline events processed",
+            ["source"],
+        )
+
     def poll(self, timeout: float = 1.0):
         return self.consumer.poll(timeout)
 
@@ -270,6 +283,14 @@ def run():
                 )
 
                 producer.publish(feature_event)
+                self_topic = msg.topic()
+                try:
+                    low, high = consumer.consumer.get_watermark_offsets(self_topic, msg.partition(), cached=False)
+                    lag = max(0, high - msg.offset() - 1)
+                    consumer.pipeline_consumer_lag.labels(topic=self_topic, group=GROUP_ID).set(lag)
+                except Exception:
+                    pass
+                consumer.pipeline_processed_events_total.labels(source=raw_event.get("source", "unknown")).inc()
                 logger.info(f"Processed {drug_a} + {drug_b} severity={severity_label} cyp450={cyp450_flag} freq={pair_frequency}")
 
             except json.JSONDecodeError as e:
@@ -284,4 +305,6 @@ def run():
 
 
 if __name__ == "__main__":
+    start_http_server(8004)
+    logger.info("Consumer metrics available at :8004/metrics")
     run()

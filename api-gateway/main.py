@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
@@ -41,7 +43,41 @@ logger = logging.getLogger(__name__)
 logger.addFilter(TraceFilter())
 
 app = FastAPI(title="Medixa API Gateway")
+
+api_request_latency_ms = Histogram(
+    "api_request_latency_ms",
+    "End-to-end API response time per request",
+    ["path", "method"],
+    buckets=[50, 100, 250, 500, 1000, 2000, 5000, 10000],
+)
+api_error_count = Counter(
+    "api_error_count",
+    "HTTP 5xx errors per endpoint",
+    ["path", "method", "status"],
+)
+drug_pairs_analysed_total = Counter(
+    "drug_pairs_analysed_total",
+    "Count of unique drug pairs analysed",
+)
+severity_class_distribution = Counter(
+    "severity_class_distribution",
+    "Severity classification counts",
+    ["severity"],
+)
+
 Instrumentator().instrument(app).expose(app)
+
+@app.middleware("http")
+async def add_metrics_middleware(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    latency_ms = (time.time() - start) * 1000
+    path = request.url.path
+    method = request.method
+    api_request_latency_ms.labels(path=path, method=method).observe(latency_ms)
+    if 500 <= response.status_code < 600:
+        api_error_count.labels(path=path, method=method, status=str(response.status_code)).inc()
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -149,6 +185,8 @@ async def generate_stream(drug_a: str, drug_b: str, trace_id: str):
         ml_result = await call_ml_service(drug_a, drug_b, trace_id)
         severity = ml_result.get("severity", "Unknown")
         confidence = ml_result.get("confidence", 0.0)
+        drug_pairs_analysed_total.inc()
+        severity_class_distribution.labels(severity=severity).inc()
         log.info("ML result: %s+%s -> %s (%.2f)", drug_a, drug_b, severity, confidence)
 
         severity_data = {
@@ -290,6 +328,3 @@ def health():
     }
 
 
-@app.get("/metrics")
-def metrics_info():
-    return {"status": "ok"}

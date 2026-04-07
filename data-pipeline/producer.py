@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import requests
 from confluent_kafka import Producer
 from dotenv import load_dotenv
+from prometheus_client import Counter, start_http_server
 
 load_dotenv()
 
@@ -240,6 +241,12 @@ class KafkaProducerClient:
             "retry.backoff.max.ms": 5000,
         })
 
+        self.ingested_events_total = Counter(
+            "data_ingestion_events_total",
+            "Count of raw events ingested from each source",
+            ["source"],
+        )
+
     def delivery_report(self, err, msg):
         if err:
             logger.error(f"Kafka delivery failed: {err}")
@@ -255,6 +262,7 @@ class KafkaProducerClient:
                 callback=self.delivery_report,
             )
             self.producer.poll(0)
+            self.ingested_events_total.labels(source=event.get("source", "unknown")).inc()
         except Exception as e:
             logger.error(f"Kafka publish error: {e}")
 
@@ -333,4 +341,6 @@ def run():
 
 
 if __name__ == "__main__":
+    start_http_server(8003)
+    logger.info("Producer metrics available at :8003/metrics")
     run()

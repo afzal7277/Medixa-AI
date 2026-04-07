@@ -1,0 +1,47 @@
+{
+  "id": null,
+  "uid": "medixa-data-pipeline",
+  "title": "Medixa AI Data Pipeline",
+  "tags": ["pipeline", "kafka", "data"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "15s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Pipeline Consumer Lag",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "pipeline_consumer_lag",
+          "legendFormat": "{{topic}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Raw Ingestion Events /sec",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "sum(rate(data_ingestion_events_total[5m])) by (source)",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Processed Feature Events /sec",
+      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8},
+      "targets": [
+        {
+          "expr": "sum(rate(pipeline_processed_events_total[5m])) by (source)",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    }
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []}
+}

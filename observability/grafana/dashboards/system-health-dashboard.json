@@ -1,0 +1,47 @@
+{
+  "id": null,
+  "uid": "medixa-system-health",
+  "title": "Medixa AI System Health",
+  "tags": ["observability", "system", "health"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "15s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "API Request Latency (P95)",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, path, method) (rate(api_request_latency_ms_bucket[5m])))",
+          "legendFormat": "{{path}} {{method}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "API 5xx Error Rate",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "sum by (path, method) (rate(api_error_count[5m]))",
+          "legendFormat": "{{path}} {{method}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Service Availability (up)",
+      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 6},
+      "targets": [
+        {
+          "expr": "up{job=~\"api-gateway|ml-service|genai-service|prometheus|grafana|data-pipeline-producer|data-pipeline-consumer\"}",
+          "legendFormat": "{{job}}"
+        }
+      ]
+    }
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []}
+}
