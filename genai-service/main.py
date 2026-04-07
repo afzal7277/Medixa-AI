@@ -58,6 +58,8 @@ class ExplainRequest(BaseModel):
     severity: str
     confidence: float
 
+class DrugInfoRequest(BaseModel):
+    name: str
 
 # ── Prompt builder ────────────────────────────────────────────────────────────
 def build_prompt(drug_a: str, drug_b: str, severity: str, confidence: float, passages: list[dict]) -> str:
@@ -109,7 +111,7 @@ async def stream_explanation(
             model=OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
-            max_tokens=600,
+            max_tokens=300,
             temperature=0.3,
         )
 
@@ -127,6 +129,51 @@ async def stream_explanation(
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+
+@app.get("/drug-info")
+async def drug_info_get(name: str):
+    return await _get_drug_info(name)
+
+@app.post("/drug-info")
+async def drug_info_post(req: DrugInfoRequest):
+    return await _get_drug_info(req.name)
+
+async def _get_drug_info(name: str) -> dict:
+    try:
+        response = await openai_client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[{
+                "role": "user",
+                "content":f"""For "{name}", determine if it is a pharmaceutical drug, medication, or medicine brand name (including Indian brand names like Dolo, Crocin, Pan, Combiflam, etc.).
+
+If it IS a drug or medicine brand:
+{{"name": "generic or proper name", "drugClass": "pharmacological class", "commonUses": "brief uses (max 5 words)", "is_drug": true}}
+
+If it is clearly NOT a medicine (e.g. food like rice, salt, vegetables):
+{{"is_drug": false}}
+
+Respond ONLY with valid JSON, no markdown."""
+            }],
+            max_tokens=80,
+            temperature=0.1,
+        )
+        text = response.choices[0].message.content.strip()
+        logger.info(f"Drug info response for {name}: {text}")
+        # strip markdown code blocks if present
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        data = json.loads(text.strip())
+        if not data.get("is_drug", True):
+            return {"name": name, "drugClass": "Not a medication", "commonUses": "—", "ai_generated": False, "is_drug": False}
+        data["ai_generated"] = True
+        data["is_drug"] = True
+        return data
+    except Exception as e:
+        logger.error(f"Drug info error for {name}: {e}")
+        return {"name": name, "drugClass": "Unknown", "commonUses": "Unknown", "ai_generated": False}
+
 @app.post("/explain")
 async def explain(req: ExplainRequest):
     if not OPENAI_API_KEY:

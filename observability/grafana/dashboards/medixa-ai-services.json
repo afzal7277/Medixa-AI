@@ -1,0 +1,68 @@
+{
+  "id": null,
+  "uid": null,
+  "title": "Medixa AI Services",
+  "tags": ["medixa", "api", "ml", "genai"],
+  "timezone": "UTC",
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Gateway Requests",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(fastapi_http_requests_total{job='api-gateway'}[1m])",
+          "legendFormat": "{{method}} {{path}}",
+          "refId": "A"
+        }
+      ],
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "title": "ML Service Response Time",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(fastapi_http_request_duration_seconds_bucket{job='ml-service'}[5m]))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "id": 3,
+      "title": "GenAI Service Latency",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(fastapi_http_request_duration_seconds_bucket{job='genai-service'}[5m]))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "id": 4,
+      "title": "Active Requests",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "fastapi_http_requests_in_progress",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 27,
+  "version": 1
+}

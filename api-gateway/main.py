@@ -30,6 +30,7 @@ logging.basicConfig(
 )
 
 
+
 class TraceFilter(logging.Filter):
     def filter(self, record):
         if not hasattr(record, "trace_id"):
@@ -225,6 +226,28 @@ async def generate_stream(drug_a: str, drug_b: str, trace_id: str):
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+async def fetch_drug_info_from_llm(drug_name: str) -> dict:
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            resp = await client.post(
+                f"{GENAI_SERVICE_URL}/drug-info",
+                json={"name": drug_name},
+            )
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            logger.error("Drug info fetch error: %s", e, extra={"trace_id": "none"})
+    return {"name": drug_name, "drugClass": "Unknown", "commonUses": "Unknown", "ai_generated": False}
+
+
+@app.get("/drug-info")
+async def drug_info(name: str):
+    if not name or len(name) < 2:
+        raise HTTPException(status_code=400, detail="Drug name too short")
+    result = await fetch_drug_info_from_llm(name)
+    return result
+
+
 @app.post("/analyse")
 async def analyse(req: AnalyseRequest):
     trace_id = str(uuid.uuid4())[:8]
