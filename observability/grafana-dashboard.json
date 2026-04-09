@@ -9,11 +9,11 @@
       {
         "id": 1,
         "title": "API Gateway Requests",
-        "datasource": "Prometheus",
+        "datasource": {"uid": "prometheus"},
         "targets": [
           {
-            "expr": "rate(fastapi_http_requests_total{job='api-gateway'}[1m])",
-            "legendFormat": "{{method}} {{path}}",
+            "expr": "rate(http_requests_total{job='api-gateway'}[1m])",
+            "legendFormat": "{{method}} {{handler}}",
             "refId": "A"
           }
         ],
@@ -23,10 +23,10 @@
       {
         "id": 2,
         "title": "ML Service Response Time",
-        "datasource": "Prometheus",
+        "datasource": {"uid": "prometheus"},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(fastapi_http_request_duration_seconds_bucket{job='ml-service'}[5m]))",
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job='ml-service'}[5m]))",
             "legendFormat": "p95",
             "refId": "A"
           }
@@ -37,10 +37,10 @@
       {
         "id": 3,
         "title": "GenAI Service Latency",
-        "datasource": "Prometheus",
+        "datasource": {"uid": "prometheus"},
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(fastapi_http_request_duration_seconds_bucket{job='genai-service'}[5m]))",
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job='genai-service'}[5m]))",
             "legendFormat": "p95",
             "refId": "A"
           }
@@ -50,11 +50,11 @@
       },
       {
         "id": 4,
-        "title": "Active Requests",
-        "datasource": "Prometheus",
+        "title": "Request Rate by Service",
+        "datasource": {"uid": "prometheus"},
         "targets": [
           {
-            "expr": "fastapi_http_requests_in_progress",
+            "expr": "sum(rate(http_requests_total{job=~\"api-gateway|ml-service|genai-service\"}[1m])) by (job)",
             "legendFormat": "{{job}}",
             "refId": "A"
           }

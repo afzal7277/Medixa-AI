@@ -1,0 +1,238 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 780" width="1100" height="780" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#64748b"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#22c55e"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#f97316"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="780" fill="#0f172a" rx="12"/>
+
+  <!-- Title -->
+  <text x="550" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#f1f5f9">Medixa AI — System Architecture</text>
+  <text x="550" y="56" text-anchor="middle" font-size="12" fill="#94a3b8">Drug Interaction Analysis Platform</text>
+
+  <!-- ═══ ZONE: USER ZONE ═══ -->
+  <rect x="16" y="70" width="180" height="80" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="106" y="94" text-anchor="middle" font-size="11" font-weight="600" fill="#94a3b8">USER</text>
+  <rect x="32" y="100" width="148" height="38" rx="7" fill="#1d4ed8" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="106" y="116" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Frontend</text>
+  <text x="106" y="129" text-anchor="middle" font-size="9" fill="#bfdbfe">React / Vite · :5173</text>
+
+  <!-- ═══ ZONE: CORE SERVICES ═══ -->
+  <rect x="220" y="70" width="500" height="260" rx="10" fill="#0f172a" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="470" y="90" text-anchor="middle" font-size="11" fill="#3b82f6" font-weight="600">CORE SERVICES</text>
+
+  <!-- API Gateway -->
+  <rect x="340" y="100" width="200" height="80" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+  <text x="440" y="122" text-anchor="middle" font-size="12" font-weight="700" fill="#3b82f6">API Gateway</text>
+  <text x="440" y="138" text-anchor="middle" font-size="9" fill="#94a3b8">FastAPI · :8000</text>
+  <text x="440" y="152" text-anchor="middle" font-size="9" fill="#64748b">/analyse  /drug-info  /history</text>
+  <text x="440" y="165" text-anchor="middle" font-size="9" fill="#64748b">Redis cache · SSE stream · trace_id</text>
+
+  <!-- ML Service -->
+  <rect x="228" y="220" width="190" height="95" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="323" y="241" text-anchor="middle" font-size="12" font-weight="700" fill="#8b5cf6">ML Service</text>
+  <text x="323" y="256" text-anchor="middle" font-size="9" fill="#94a3b8">FastAPI · :8001</text>
+  <text x="323" y="270" text-anchor="middle" font-size="9" fill="#64748b">BioBERT embeddings (768d × 2)</text>
+  <text x="323" y="283" text-anchor="middle" font-size="9" fill="#64748b">XGBoost classifier (1538 features)</text>
+  <text x="323" y="297" text-anchor="middle" font-size="9" fill="#64748b">Severity + Confidence → JSON</text>
+
+  <!-- GenAI Service -->
+  <rect x="462" y="220" width="240" height="95" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="582" y="241" text-anchor="middle" font-size="12" font-weight="700" fill="#10b981">GenAI Service</text>
+  <text x="582" y="256" text-anchor="middle" font-size="9" fill="#94a3b8">FastAPI · :8002</text>
+  <text x="582" y="270" text-anchor="middle" font-size="9" fill="#64748b">ChromaDB RAG (top-3 passages)</text>
+  <text x="582" y="283" text-anchor="middle" font-size="9" fill="#64748b">GPT-4o clinical explanation</text>
+  <text x="582" y="297" text-anchor="middle" font-size="9" fill="#64748b">SSE token stream</text>
+
+  <!-- ═══ ZONE: INFRASTRUCTURE ═══ -->
+  <rect x="730" y="70" width="355" height="260" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="907" y="90" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="600">INFRASTRUCTURE</text>
+
+  <!-- Redis -->
+  <rect x="740" y="100" width="155" height="95" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="817" y="122" text-anchor="middle" font-size="12" font-weight="700" fill="#ef4444">Redis</text>
+  <text x="817" y="137" text-anchor="middle" font-size="9" fill="#94a3b8">:6379</text>
+  <text x="817" y="152" text-anchor="middle" font-size="9" fill="#64748b">cache: (1 h TTL)</text>
+  <text x="817" y="165" text-anchor="middle" font-size="9" fill="#64748b">pair: frequency counters</text>
+  <text x="817" y="178" text-anchor="middle" font-size="9" fill="#64748b">query_history list</text>
+
+  <!-- Kafka -->
+  <rect x="915" y="100" width="155" height="95" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="992" y="122" text-anchor="middle" font-size="12" font-weight="700" fill="#f59e0b">Kafka</text>
+  <text x="992" y="137" text-anchor="middle" font-size="9" fill="#94a3b8">KRaft · :9092</text>
+  <text x="992" y="152" text-anchor="middle" font-size="9" fill="#64748b">raw_drug_events</text>
+  <text x="992" y="165" text-anchor="middle" font-size="9" fill="#64748b">processed_features</text>
+  <text x="992" y="180" text-anchor="middle" font-size="9" fill="#64748b">auto-create topics</text>
+
+  <!-- Prometheus + Grafana -->
+  <rect x="740" y="210" width="145" height="107" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+  <text x="812" y="231" text-anchor="middle" font-size="11" font-weight="700" fill="#f97316">Prometheus</text>
+  <text x="812" y="246" text-anchor="middle" font-size="9" fill="#94a3b8">:9090</text>
+  <text x="812" y="263" text-anchor="middle" font-size="9" fill="#64748b">scrapes all /metrics</text>
+  <line x1="740" y1="277" x2="885" y2="277" stroke="#334155" stroke-width="1"/>
+  <text x="812" y="294" text-anchor="middle" font-size="11" font-weight="700" fill="#fb923c">Grafana</text>
+  <text x="812" y="308" text-anchor="middle" font-size="9" fill="#94a3b8">:3000</text>
+
+  <!-- ML Model Volume -->
+  <rect x="905" y="210" width="165" height="107" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <text x="987" y="231" text-anchor="middle" font-size="11" font-weight="700" fill="#94a3b8">Volumes</text>
+  <text x="987" y="249" text-anchor="middle" font-size="9" fill="#64748b">ml-model: XGBoost + labels</text>
+  <text x="987" y="263" text-anchor="middle" font-size="9" fill="#64748b">chroma-data: vector store</text>
+  <text x="987" y="277" text-anchor="middle" font-size="9" fill="#64748b">model-cache: HuggingFace</text>
+  <text x="987" y="291" text-anchor="middle" font-size="9" fill="#64748b">kafka-data: log segments</text>
+  <text x="987" y="305" text-anchor="middle" font-size="9" fill="#64748b">grafana-data: dashboards</text>
+
+  <!-- ═══ ZONE: DATA PIPELINE ═══ -->
+  <rect x="16" y="350" width="1068" height="230" rx="10" fill="#0f172a" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text x="550" y="370" text-anchor="middle" font-size="11" fill="#d97706" font-weight="600">BACKGROUND DATA PIPELINE (continuous)</text>
+
+  <!-- OpenFDA -->
+  <rect x="30" y="383" width="140" height="75" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="100" y="405" text-anchor="middle" font-size="11" font-weight="700" fill="#94a3b8">OpenFDA API</text>
+  <text x="100" y="421" text-anchor="middle" font-size="9" fill="#64748b">api.fda.gov/drug</text>
+  <text x="100" y="436" text-anchor="middle" font-size="9" fill="#64748b">/event.json (ADRs)</text>
+  <text x="100" y="449" text-anchor="middle" font-size="9" fill="#64748b">/label.json (DDI text)</text>
+
+  <!-- Producer -->
+  <rect x="200" y="383" width="165" height="75" rx="8" fill="#1e293b" stroke="#d97706" stroke-width="1.5"/>
+  <text x="282" y="405" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">Producer</text>
+  <text x="282" y="420" text-anchor="middle" font-size="9" fill="#94a3b8">:8003 (metrics)</text>
+  <text x="282" y="435" text-anchor="middle" font-size="9" fill="#64748b">poll every 60 s</text>
+  <text x="282" y="449" text-anchor="middle" font-size="9" fill="#64748b">extract drug pairs → event</text>
+
+  <!-- Consumer -->
+  <rect x="400" y="383" width="200" height="75" rx="8" fill="#1e293b" stroke="#d97706" stroke-width="1.5"/>
+  <text x="500" y="405" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">Consumer / Feature Eng.</text>
+  <text x="500" y="420" text-anchor="middle" font-size="9" fill="#94a3b8">:8004 (metrics)</text>
+  <text x="500" y="435" text-anchor="middle" font-size="9" fill="#64748b">BioBERT embed · CYP450 detect</text>
+  <text x="500" y="449" text-anchor="middle" font-size="9" fill="#64748b">severity label · pair freq (Redis)</text>
+
+  <!-- ML Trainer -->
+  <rect x="630" y="383" width="185" height="75" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="722" y="405" text-anchor="middle" font-size="11" font-weight="700" fill="#8b5cf6">ML Trainer</text>
+  <text x="722" y="420" text-anchor="middle" font-size="9" fill="#64748b">retrain every 1 h</text>
+  <text x="722" y="435" text-anchor="middle" font-size="9" fill="#64748b">min 500 samples required</text>
+  <text x="722" y="449" text-anchor="middle" font-size="9" fill="#64748b">XGBoost → saves model</text>
+
+  <!-- RAG Populator -->
+  <rect x="845" y="383" width="220" height="75" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="955" y="405" text-anchor="middle" font-size="11" font-weight="700" fill="#10b981">RAG Populator</text>
+  <text x="955" y="420" text-anchor="middle" font-size="9" fill="#64748b">startup: reads raw_drug_events</text>
+  <text x="955" y="435" text-anchor="middle" font-size="9" fill="#64748b">BioBERT embed in batches</text>
+  <text x="955" y="449" text-anchor="middle" font-size="9" fill="#64748b">upserts to ChromaDB</text>
+
+  <!-- Pipeline Kafka labels -->
+  <rect x="370" y="388" width="20" height="12" rx="3" fill="#f59e0b" opacity="0.2"/>
+  <text x="342" y="478" text-anchor="middle" font-size="8" fill="#f59e0b">raw_drug_events</text>
+  <text x="600" y="478" text-anchor="middle" font-size="8" fill="#f59e0b">processed_features</text>
+
+  <!-- ═══ LEGEND ═══ -->
+  <rect x="16" y="596" width="1068" height="170" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="550" y="618" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="600">REQUEST FLOW LEGEND</text>
+
+  <!-- Flow steps -->
+  <rect x="30" y="630" width="300" height="125" rx="6" fill="#1e293b"/>
+  <text x="180" y="648" text-anchor="middle" font-size="10" font-weight="700" fill="#3b82f6">User Request Flow</text>
+  <text x="40" y="665" font-size="9" fill="#94a3b8">1. User types drug → GET /drug-info → GPT-4o profile</text>
+  <text x="40" y="680" font-size="9" fill="#94a3b8">2. Click Analyse → POST /analyse (SSE)</text>
+  <text x="40" y="695" font-size="9" fill="#94a3b8">3. Gateway checks Redis cache</text>
+  <text x="40" y="710" font-size="9" fill="#94a3b8">4. Cache miss → POST /predict → BioBERT + XGBoost</text>
+  <text x="40" y="725" font-size="9" fill="#94a3b8">5. severity SSE event → frontend badge</text>
+  <text x="40" y="740" font-size="9" fill="#94a3b8">6. POST /explain → RAG + GPT-4o → token stream</text>
+  <text x="40" y="755" font-size="9" fill="#94a3b8">7. Cache result, add to history</text>
+
+  <rect x="345" y="630" width="300" height="125" rx="6" fill="#1e293b"/>
+  <text x="495" y="648" text-anchor="middle" font-size="10" font-weight="700" fill="#d97706">Background Pipeline</text>
+  <text x="355" y="665" font-size="9" fill="#94a3b8">A. Producer polls OpenFDA every 60 s</text>
+  <text x="355" y="680" font-size="9" fill="#94a3b8">B. Publishes raw events → Kafka raw_drug_events</text>
+  <text x="355" y="695" font-size="9" fill="#94a3b8">C. Consumer embeds, labels, enriches → processed_features</text>
+  <text x="355" y="710" font-size="9" fill="#94a3b8">D. RAG populator seeds ChromaDB at startup</text>
+  <text x="355" y="725" font-size="9" fill="#94a3b8">E. ML Trainer retrains XGBoost every hour</text>
+  <text x="355" y="740" font-size="9" fill="#94a3b8">F. Model served by ML Service via shared volume</text>
+
+  <rect x="660" y="630" width="410" height="125" rx="6" fill="#1e293b"/>
+  <text x="865" y="648" text-anchor="middle" font-size="10" font-weight="700" fill="#f97316">Severity Classes &amp; Color Map</text>
+  <rect x="670" y="658" width="12" height="12" rx="2" fill="#18181b"/>
+  <text x="688" y="669" font-size="9" fill="#94a3b8">Contraindicated — do not use together</text>
+  <rect x="670" y="678" width="12" height="12" rx="2" fill="#ef4444"/>
+  <text x="688" y="689" font-size="9" fill="#94a3b8">Severe — avoid if possible</text>
+  <rect x="670" y="698" width="12" height="12" rx="2" fill="#f97316"/>
+  <text x="688" y="709" font-size="9" fill="#94a3b8">Moderate — use with caution</text>
+  <rect x="670" y="718" width="12" height="12" rx="2" fill="#eab308"/>
+  <text x="688" y="729" font-size="9" fill="#94a3b8">Mild — monitor patient</text>
+  <rect x="670" y="738" width="12" height="12" rx="2" fill="#22c55e"/>
+  <text x="688" y="749" font-size="9" fill="#94a3b8">None — no known interaction</text>
+  <text x="865" y="749" text-anchor="middle" font-size="9" fill="#475569">Features: BioBERT(768d)×2 + CYP450 + freq = 1538d</text>
+
+  <!-- ════ ARROWS ════ -->
+
+  <!-- User → API Gateway -->
+  <line x1="180" y1="119" x2="338" y2="140" stroke="#3b82f6" stroke-width="1.8" marker-end="url(#arr-blue)"/>
+  <text x="256" y="122" text-anchor="middle" font-size="8" fill="#3b82f6">HTTP / SSE</text>
+
+  <!-- API Gateway → ML Service -->
+  <line x1="390" y1="180" x2="360" y2="219" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="340" y="205" font-size="8" fill="#94a3b8">POST /predict</text>
+
+  <!-- API Gateway → GenAI Service -->
+  <line x1="490" y1="180" x2="540" y2="219" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="520" y="205" font-size="8" fill="#94a3b8">POST /explain</text>
+
+  <!-- API Gateway → Redis (cache) -->
+  <line x1="540" y1="140" x2="739" y2="148" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="638" y="135" text-anchor="middle" font-size="8" fill="#ef4444">cache r/w</text>
+
+  <!-- ML Service → Redis (pair freq) -->
+  <line x1="418" y1="275" x2="740" y2="170" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+  <text x="595" y="232" font-size="8" fill="#ef4444">pair freq / cyp450</text>
+
+  <!-- ML Service → Kafka (model volume implied by arrow to volumes) -->
+  <line x1="418" y1="297" x2="905" y2="270" stroke="#475569" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+  <text x="670" y="308" font-size="8" fill="#475569">reads model</text>
+
+  <!-- Kafka → Prometheus (scrape) -->
+  <line x1="915" y1="170" x2="886" y2="225" stroke="#f97316" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+
+  <!-- Pipeline arrows -->
+  <!-- OpenFDA → Producer -->
+  <line x1="170" y1="420" x2="198" y2="420" stroke="#d97706" stroke-width="1.8" marker-end="url(#arr-orange)"/>
+
+  <!-- Producer → Kafka raw_drug_events label -->
+  <line x1="365" y1="420" x2="399" y2="420" stroke="#f59e0b" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="382" y="412" text-anchor="middle" font-size="7" fill="#f59e0b">raw</text>
+
+  <!-- Consumer → processed_features → ML Trainer -->
+  <line x1="600" y1="420" x2="628" y2="420" stroke="#f59e0b" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="614" y="412" text-anchor="middle" font-size="7" fill="#f59e0b">proc</text>
+
+  <!-- Consumer → Redis pair freq -->
+  <line x1="500" y1="383" x2="817" y2="318" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+
+  <!-- ML Trainer → Volumes -->
+  <line x1="815" y1="420" x2="905" y2="288" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="872" y="370" font-size="8" fill="#475569">save model</text>
+
+  <!-- RAG Populator → ChromaDB (via genai service / volumes) -->
+  <line x1="955" y1="383" x2="650" y2="315" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+  <text x="820" y="345" font-size="8" fill="#10b981">seeds ChromaDB</text>
+
+  <!-- Producer → Kafka box in infrastructure -->
+  <line x1="282" y1="383" x2="992" y2="195" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+
+  <!-- Prometheus scrape lines from services -->
+  <line x1="440" y1="180" x2="780" y2="223" stroke="#f97316" stroke-width="1" stroke-dasharray="2,4" marker-end="url(#arr)"/>
+
+  <!-- Grafana → Prometheus -->
+  <line x1="812" y1="277" x2="812" y2="277" stroke="#f97316" stroke-width="1"/>
+</svg>
