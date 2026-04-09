@@ -8,7 +8,7 @@ import redis
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from prometheus_client import Histogram
+from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from sentence_transformers import SentenceTransformer
 
@@ -42,6 +42,15 @@ ml_model_confidence = Histogram(
     "ML model confidence scores",
     ["model"],
     buckets=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+)
+ml_severity_predictions_total = Counter(
+    "ml_severity_predictions_total",
+    "Count of severity predictions by class",
+    ["severity"],
+)
+ml_model_retrain_total = Counter(
+    "ml_model_retrain_total",
+    "Count of successful model retrains",
 )
 
 Instrumentator().instrument(app).expose(app)
@@ -96,6 +105,7 @@ class ModelService:
                 with open(LABEL_ENCODER_PATH) as f:
                     self.classes = json.load(f)
                 logger.info(f"Model loaded. Classes: {self.classes}")
+                ml_model_retrain_total.inc()
                 return
             except Exception as e:
                 logger.error(f"Model load error attempt {attempt}: {e}")
@@ -169,7 +179,7 @@ redis_client = RedisClient()
 def health():
     return {
         "status": "ok",
-        "model_loaded": model_service.session is not None,
+        "model_loaded": model_service.model is not None,
         "classes": model_service.classes,
     }
 
@@ -202,6 +212,7 @@ def predict(req: PredictRequest):
         duration_ms = (time.time() - start_time) * 1000
         ml_inference_latency_ms.labels(model="severity_classifier").observe(duration_ms)
         ml_model_confidence.labels(model="severity_classifier").observe(confidence)
+        ml_severity_predictions_total.labels(severity=severity).inc()
 
         logger.info(f"Predicted {drug_a}+{drug_b} -> {severity} ({confidence:.3f}) freq={pair_frequency} cyp450={cyp450_flag}")
 

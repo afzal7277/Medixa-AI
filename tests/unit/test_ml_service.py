@@ -96,8 +96,10 @@ class TestModelService:
     def test_predict_raises_when_model_none(self):
         original = _ml.model_service.model
         _ml.model_service.model = None
-        with pytest.raises(RuntimeError, match="Model not available"):
-            _ml.model_service.predict(np.zeros((1, 1538), dtype=np.float32))
+        # Patch reload so it doesn't re-load the mock model — model stays None
+        with patch.object(_ml.model_service, "reload", return_value=None):
+            with pytest.raises(RuntimeError, match="Model not available"):
+                _ml.model_service.predict(np.zeros((1, 1538), dtype=np.float32))
         _ml.model_service.model = original
 
 

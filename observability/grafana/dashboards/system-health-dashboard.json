@@ -1,45 +1,222 @@
 {
   "id": null,
   "uid": "medixa-system-health",
-  "title": "Medixa AI System Health",
+  "title": "Medixa AI — System Health",
   "tags": ["observability", "system", "health"],
   "timezone": "browser",
   "schemaVersion": 36,
-  "version": 1,
+  "version": 3,
   "refresh": "15s",
   "panels": [
     {
+      "id": 1,
       "type": "timeseries",
-      "title": "API Request Latency (P95)",
-      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "title": "API Gateway — Request Latency p50 / p90 / p99 (ms)",
+      "description": "api_request_latency_ms histogram — buckets in milliseconds.",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 9},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {"lineWidth": 2, "fillOpacity": 8}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "p50"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]},
+          {"matcher": {"id": "byName", "options": "p90"}, "properties": [{"id": "color", "value": {"fixedColor": "#FADE2A", "mode": "fixed"}}]},
+          {"matcher": {"id": "byName", "options": "p99"}, "properties": [{"id": "color", "value": {"fixedColor": "#F2495C", "mode": "fixed"}}]}
+        ]
+      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, method, path) (rate(fastapi_http_request_duration_seconds_bucket{job='api-gateway'}[5m])))",
-          "legendFormat": "{{method}} {{path}}"
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(api_request_latency_ms_bucket{job='api-gateway'}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(api_request_latency_ms_bucket{job='api-gateway'}[5m])))",
+          "legendFormat": "p90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(api_request_latency_ms_bucket{job='api-gateway'}[5m])))",
+          "legendFormat": "p99"
         }
       ]
     },
     {
+      "id": 2,
       "type": "timeseries",
-      "title": "API 5xx Error Rate",
-      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "title": "ML Service — Request Latency p50 / p90 / p99 (s)",
+      "description": "http_request_duration_seconds from prometheus_fastapi_instrumentator.",
+      "gridPos": {"x": 0, "y": 9, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {"lineWidth": 2, "fillOpacity": 8}
+        }
+      },
       "targets": [
         {
-          "expr": "sum(rate(fastapi_http_requests_total{job='api-gateway', status_code=~'5..'} [5m])) by (method, path)",
-          "legendFormat": "{{method}} {{path}}"
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job='ml-service'}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(http_request_duration_seconds_bucket{job='ml-service'}[5m])))",
+          "legendFormat": "p90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job='ml-service'}[5m])))",
+          "legendFormat": "p99"
         }
       ]
     },
     {
+      "id": 3,
+      "type": "timeseries",
+      "title": "GenAI Service — Request Latency p50 / p90 / p99 (s)",
+      "description": "http_request_duration_seconds from prometheus_fastapi_instrumentator.",
+      "gridPos": {"x": 12, "y": 9, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {"lineWidth": 2, "fillOpacity": 8}
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job='genai-service'}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(http_request_duration_seconds_bucket{job='genai-service'}[5m])))",
+          "legendFormat": "p90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job='genai-service'}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "5xx Error Rate — per service",
+      "description": "api_error_count_total for api-gateway; http_request_duration_seconds_count filtered by status for ml/genai.",
+      "gridPos": {"x": 0, "y": 17, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(api_error_count_total{job='api-gateway'}[5m]))",
+          "legendFormat": "api-gateway"
+        },
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{job='ml-service', status=~'5..'}[5m]))",
+          "legendFormat": "ml-service"
+        },
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{job='genai-service', status=~'5..'}[5m]))",
+          "legendFormat": "genai-service"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Total Request Rate — per service",
+      "description": "Requests per second across all routes, per service.",
+      "gridPos": {"x": 12, "y": 17, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(api_request_latency_ms_count{job='api-gateway'}[5m]))",
+          "legendFormat": "api-gateway"
+        },
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{job='ml-service'}[5m]))",
+          "legendFormat": "ml-service"
+        },
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{job='genai-service'}[5m]))",
+          "legendFormat": "genai-service"
+        }
+      ]
+    },
+    {
+      "id": 6,
       "type": "stat",
-      "title": "Service Availability (up)",
-      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 6},
-      "targets": [
-        {
-          "expr": "up{job=~\"api-gateway|ml-service|genai-service|prometheus|grafana|data-pipeline-producer|data-pipeline-consumer\"}",
-          "legendFormat": "{{job}}"
+      "title": "Uptime — api-gateway",
+      "gridPos": {"x": 0, "y": 25, "w": 8, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}
         }
-      ]
+      },
+      "targets": [{"expr": "up{job='api-gateway'}", "legendFormat": "api-gateway"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Uptime — ml-service",
+      "gridPos": {"x": 8, "y": 25, "w": 8, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}
+        }
+      },
+      "targets": [{"expr": "up{job='ml-service'}", "legendFormat": "ml-service"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Uptime — genai-service",
+      "gridPos": {"x": 16, "y": 25, "w": 8, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}
+        }
+      },
+      "targets": [{"expr": "up{job='genai-service'}", "legendFormat": "genai-service"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Uptime — prometheus",
+      "gridPos": {"x": 0, "y": 30, "w": 12, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}
+        }
+      },
+      "targets": [{"expr": "up{job='prometheus'}", "legendFormat": "prometheus"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Uptime — grafana",
+      "gridPos": {"x": 12, "y": 30, "w": 12, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}
+        }
+      },
+      "targets": [{"expr": "up{job='grafana'}", "legendFormat": "grafana"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
     }
   ],
   "templating": {"list": []},

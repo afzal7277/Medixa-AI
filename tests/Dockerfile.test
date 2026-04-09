@@ -1,9 +1,8 @@
 FROM python:3.11-slim
 
-# System deps for playwright + numpy
+# System deps for numpy + Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ curl \
-    # Playwright system deps
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
     libgbm1 libasound2 libpango-1.0-0 libcairo2 libx11-6 \
@@ -11,25 +10,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy service source (tests import these modules directly)
+# ── Install dependencies FIRST (cached layer — only reruns when requirements-test.txt changes) ──
+COPY tests/requirements-test.txt tests/requirements-test.txt
+RUN pip install --no-cache-dir -r tests/requirements-test.txt
+
+# Install Playwright browser (also cached — only reruns if playwright version changes)
+RUN playwright install chromium --with-deps 2>/dev/null || true
+
+# ── Copy source AFTER pip install (code changes don't invalidate the pip cache layer) ──
 COPY api-gateway/   api-gateway/
 COPY ml-service/    ml-service/
 COPY genai-service/ genai-service/
 COPY data-pipeline/ data-pipeline/
-
-# Copy tests
 COPY tests/ tests/
 
-# Install test dependencies
-RUN pip install --no-cache-dir -r tests/requirements-test.txt
-
-# Install Playwright browsers (only chromium needed for E2E)
-RUN playwright install chromium --with-deps 2>/dev/null || true
-
-# Results directory (will be mounted as a volume)
+# Results directory (mounted as a volume by docker-compose.test.yml)
 RUN mkdir -p tests/results
 
-# Default: unit + integration (no Docker/Kafka)
+# Default: unit + integration (no Docker/Kafka socket needed)
 CMD ["pytest", "tests/unit/", "tests/integration/", \
      "-v", "--tb=short", \
      "-c", "tests/pytest.ini", \

@@ -23,12 +23,43 @@ except ImportError:
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
+
+# Cache modules by file path so the same service is never executed twice.
+# This prevents duplicate Prometheus metric registration when unit and
+# integration tests both load the same service file under different aliases.
+_service_cache: dict[str, object] = {}
+
+
 def load_service(alias: str, rel_path: str):
     """Load a service module under a unique alias to avoid namespace collisions
-    when multiple services share the same filename (e.g. main.py)."""
+    when multiple services share the same filename (e.g. main.py).
+
+    The service directory is temporarily added to sys.path so that relative
+    sibling imports (e.g. `from rag import RAGService` inside genai-service/)
+    resolve correctly without polluting the path permanently.
+
+    Subsequent calls with the same rel_path return the cached module under
+    the new alias — module-level code (incl. Prometheus metric registration)
+    is only executed once per test session.
+    """
+    if rel_path in _service_cache:
+        mod = _service_cache[rel_path]
+        sys.modules[alias] = mod
+        return mod
+
     full_path = os.path.join(PROJECT_ROOT, rel_path)
-    spec = importlib.util.spec_from_file_location(alias, full_path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[alias] = mod
-    spec.loader.exec_module(mod)
+    service_dir = os.path.dirname(full_path)
+    injected = service_dir not in sys.path
+    if injected:
+        sys.path.insert(0, service_dir)
+    try:
+        spec = importlib.util.spec_from_file_location(alias, full_path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[alias] = mod
+        spec.loader.exec_module(mod)
+    finally:
+        if injected:
+            sys.path.remove(service_dir)
+
+    _service_cache[rel_path] = mod
     return mod

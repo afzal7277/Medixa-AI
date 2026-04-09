@@ -1,45 +1,171 @@
 {
   "id": null,
   "uid": "medixa-data-pipeline",
-  "title": "Medixa AI Data Pipeline",
+  "title": "Medixa AI — Data Pipeline",
   "tags": ["pipeline", "kafka", "data"],
   "timezone": "browser",
   "schemaVersion": 36,
-  "version": 1,
+  "version": 3,
   "refresh": "15s",
   "panels": [
     {
+      "id": 1,
       "type": "timeseries",
-      "title": "Pipeline Consumer Lag",
-      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "title": "Kafka Consumer Lag — per topic",
+      "description": "pipeline_consumer_lag gauge. A rising lag means the consumer is falling behind ingestion rate.",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 9},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {"lineWidth": 2, "fillOpacity": 15},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 500}, {"color": "red", "value": 2000}]}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "raw_drug_events"},    "properties": [{"id": "color", "value": {"fixedColor": "#8AB8FF", "mode": "fixed"}}]},
+          {"matcher": {"id": "byName", "options": "processed_features"}, "properties": [{"id": "color", "value": {"fixedColor": "#73BF69", "mode": "fixed"}}]}
+        ]
+      },
       "targets": [
         {
-          "expr": "pipeline_consumer_lag",
-          "legendFormat": "{{topic}}"
+          "expr": "pipeline_consumer_lag{topic='raw_drug_events'}",
+          "legendFormat": "raw_drug_events"
+        },
+        {
+          "expr": "pipeline_consumer_lag{topic='processed_features'}",
+          "legendFormat": "processed_features"
         }
       ]
     },
     {
+      "id": 2,
       "type": "timeseries",
-      "title": "Raw Ingestion Events /sec",
-      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
-      "targets": [
-        {
-          "expr": "sum(rate(data_ingestion_events_total[5m])) by (source)",
-          "legendFormat": "{{source}}"
+      "title": "Ingestion Events /sec — per source",
+      "description": "data_ingestion_events_total — rate of raw events ingested, broken out by source (openfda, pubmed, rxnorm, manual).",
+      "gridPos": {"x": 0, "y": 9, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
         }
+      },
+      "targets": [
+        {"expr": "sum(rate(data_ingestion_events_total{source='openfda'}[5m]))", "legendFormat": "openfda"},
+        {"expr": "sum(rate(data_ingestion_events_total{source='pubmed'}[5m]))",  "legendFormat": "pubmed"},
+        {"expr": "sum(rate(data_ingestion_events_total{source='rxnorm'}[5m]))",  "legendFormat": "rxnorm"},
+        {"expr": "sum(rate(data_ingestion_events_total{source='manual'}[5m]))",  "legendFormat": "manual"},
+        {"expr": "sum(rate(data_ingestion_events_total[5m]))",                   "legendFormat": "total"}
       ]
     },
     {
+      "id": 3,
       "type": "timeseries",
-      "title": "Processed Feature Events /sec",
-      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8},
+      "title": "Feature Processing Throughput /sec",
+      "description": "pipeline_processed_events_total — rate of events successfully processed through BioBERT embedding + severity extraction and written to processed_features topic.",
+      "gridPos": {"x": 12, "y": 9, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        }
+      },
       "targets": [
         {
           "expr": "sum(rate(pipeline_processed_events_total[5m])) by (source)",
           "legendFormat": "{{source}}"
         }
       ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Ingestion Volume (24h) — stacked by source",
+      "description": "increase() over 24 hours. Use to spot source outages or unusual volume spikes.",
+      "gridPos": {"x": 0, "y": 17, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "stacking": {"mode": "normal", "group": "A"}
+          }
+        }
+      },
+      "targets": [
+        {"expr": "increase(data_ingestion_events_total{source='openfda'}[24h])", "legendFormat": "openfda"},
+        {"expr": "increase(data_ingestion_events_total{source='pubmed'}[24h])",  "legendFormat": "pubmed"},
+        {"expr": "increase(data_ingestion_events_total{source='rxnorm'}[24h])",  "legendFormat": "rxnorm"},
+        {"expr": "increase(data_ingestion_events_total{source='manual'}[24h])",  "legendFormat": "manual"}
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Ingestion vs Processed Rate",
+      "description": "Gap between raw ingestion rate and processed feature rate — a widening gap indicates processing bottleneck.",
+      "gridPos": {"x": 12, "y": 17, "w": 12, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(data_ingestion_events_total[5m]))",
+          "legendFormat": "ingested"
+        },
+        {
+          "expr": "sum(rate(pipeline_processed_events_total[5m]))",
+          "legendFormat": "processed"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Total Ingested (24h)",
+      "gridPos": {"x": 0, "y": 25, "w": 6, "h": 5},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "targets": [{"expr": "increase(data_ingestion_events_total[24h])", "legendFormat": "events"}],
+      "options": {"reduceOptions": {"calcs": ["sum"]}, "colorMode": "value"}
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Total Processed (24h)",
+      "gridPos": {"x": 6, "y": 25, "w": 6, "h": 5},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "targets": [{"expr": "increase(pipeline_processed_events_total[24h])", "legendFormat": "processed"}],
+      "options": {"reduceOptions": {"calcs": ["sum"]}, "colorMode": "value"}
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Consumer Lag — raw_drug_events",
+      "gridPos": {"x": 12, "y": 25, "w": 6, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 500}, {"color": "red", "value": 2000}]}
+        }
+      },
+      "targets": [{"expr": "pipeline_consumer_lag{topic='raw_drug_events'}", "legendFormat": "lag"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Consumer Lag — processed_features",
+      "gridPos": {"x": 18, "y": 25, "w": 6, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 500}, {"color": "red", "value": 2000}]}
+        }
+      },
+      "targets": [{"expr": "pipeline_consumer_lag{topic='processed_features'}", "legendFormat": "lag"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
     }
   ],
   "templating": {"list": []},

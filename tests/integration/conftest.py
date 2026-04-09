@@ -43,7 +43,13 @@ def kafka_container():
     except ImportError:
         pytest.skip("testcontainers[kafka] not available")
 
-    with KafkaContainer("confluentinc/cp-kafka:7.7.0") as kafka:
-        os.environ["KAFKA_BOOTSTRAP_SERVERS"] = kafka.get_bootstrap_server()
-        yield kafka
-        del os.environ["KAFKA_BOOTSTRAP_SERVERS"]
+    try:
+        container = KafkaContainer("confluentinc/cp-kafka:7.7.0")
+        container.start()
+    except Exception as e:
+        pytest.skip(f"Docker not available (run with Docker socket mounted): {e}")
+
+    os.environ["KAFKA_BOOTSTRAP_SERVERS"] = container.get_bootstrap_server()
+    yield container
+    container.stop()
+    os.environ.pop("KAFKA_BOOTSTRAP_SERVERS", None)
