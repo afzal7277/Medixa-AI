@@ -238,8 +238,6 @@ medixa-ai/
 | `docs/model_card.md` | ML model: features, metrics, limitations |
 | `docs/data_collection_report.md` | Data sources, label distribution, quality issues |
 | `docs/drug_pairs.md` | Reference drug pairs for each severity level |
-| `docs/Medixa_AI_Presentation.pptx` | 6-slide pitch deck |
-| `docs/Medixa_AI_Documentation.docx` | Detailed Word document |
 
 ---
 
