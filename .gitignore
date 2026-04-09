@@ -50,6 +50,19 @@ notebooks/.ipynb_checkpoints/
 htmlcov/
 .coverage
 
+# Test results (generated reports — keep .gitkeep)
+tests/results/report.html
+tests/results/coverage/
+tests/results/screenshots/
+tests/results/videos/
+
 # uv
 uv.lock
 pyproject.toml
+
+# Docs
+docs/gen_docx.py
+docs/gen_pptx.py
+docs/Medixa_AI_Documentation.docx
+docs/Medixa_AI_Presentation.pptx
+docs/~$dixa_AI_Documentation.docx

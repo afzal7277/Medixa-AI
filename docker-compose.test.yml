@@ -1,0 +1,232 @@
+##############################################################################
+# Medixa AI — Test Compose
+#
+# Unit + Integration (no stack needed):
+#   docker compose -f docker-compose.test.yml run --rm test-unit
+#
+# E2E (spins up full stack then runs Playwright):
+#   docker compose -f docker-compose.test.yml --profile e2e up \
+#     --exit-code-from e2e-runner --abort-on-container-exit
+#
+# Results land in:  ./tests/results/report.html
+#                   ./tests/results/coverage/index.html
+##############################################################################
+
+services:
+
+  # ── Unit + Integration tests ───────────────────────────────────────────────
+  # fakeredis is in-process; no real Redis/Kafka needed for unit or basic integration.
+  test-unit:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    container_name: medixa-test-unit
+    volumes:
+      - ./tests/results:/app/tests/results
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-placeholder}
+    command: >
+      pytest tests/unit/ tests/integration/
+      -v --tb=short
+      -c tests/pytest.ini
+      --html=tests/results/report.html --self-contained-html
+      --cov=api-gateway --cov=ml-service --cov=genai-service --cov=data-pipeline
+      --cov-report=html:tests/results/coverage
+      --cov-report=term-missing:skip-covered
+    profiles: [""]   # always available (default profile)
+
+  # ── Unit tests only (fastest, ~seconds) ───────────────────────────────────
+  test-unit-only:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    container_name: medixa-test-unit-only
+    volumes:
+      - ./tests/results:/app/tests/results
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-placeholder}
+    command: >
+      pytest tests/unit/
+      -v --tb=short
+      -c tests/pytest.ini
+      --html=tests/results/report.html --self-contained-html
+    profiles: [""]
+
+  # ── E2E: full application stack ────────────────────────────────────────────
+  # Reuses the same service definitions as the main docker-compose.yml
+  # but scoped to this compose file via aliases.
+
+  e2e-redis:
+    image: redis:7
+    container_name: medixa-e2e-redis
+    profiles: ["e2e"]
+
+  e2e-kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: medixa-e2e-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://e2e-kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@e2e-kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ["e2e"]
+
+  e2e-ml:
+    build: ./ml-service
+    container_name: medixa-e2e-ml
+    depends_on:
+      e2e-kafka:
+        condition: service_healthy
+      e2e-redis:
+        condition: service_started
+    env_file: .env
+    environment:
+      - REDIS_HOST=e2e-redis
+      - KAFKA_BOOTSTRAP_SERVERS=e2e-kafka:29092
+    volumes:
+      - e2e-ml-model:/app/model
+      - e2e-model-cache:/root/.cache/huggingface
+    restart: on-failure
+    profiles: ["e2e"]
+
+  e2e-ml-trainer:
+    build: ./ml-service
+    container_name: medixa-e2e-trainer
+    depends_on:
+      e2e-kafka:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - REDIS_HOST=e2e-redis
+      - KAFKA_BOOTSTRAP_SERVERS=e2e-kafka:29092
+      - MIN_SAMPLES=50
+    volumes:
+      - e2e-ml-model:/app/model
+      - e2e-model-cache:/root/.cache/huggingface
+    command: ["python", "train.py"]
+    restart: on-failure
+    profiles: ["e2e"]
+
+  e2e-genai:
+    build: ./genai-service
+    container_name: medixa-e2e-genai
+    depends_on:
+      e2e-kafka:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=e2e-kafka:29092
+      - CHROMA_PATH=/app/chromadb
+    volumes:
+      - e2e-chroma:/app/chromadb
+      - e2e-model-cache:/root/.cache/huggingface
+    restart: on-failure
+    profiles: ["e2e"]
+
+  e2e-pipeline:
+    build: ./data-pipeline
+    container_name: medixa-e2e-pipeline
+    depends_on:
+      e2e-kafka:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=e2e-kafka:29092
+      - REDIS_HOST=e2e-redis
+    volumes:
+      - e2e-model-cache:/root/.cache/huggingface
+    restart: on-failure
+    profiles: ["e2e"]
+
+  e2e-consumer:
+    build: ./data-pipeline
+    container_name: medixa-e2e-consumer
+    depends_on:
+      e2e-kafka:
+        condition: service_healthy
+      e2e-redis:
+        condition: service_started
+    env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=e2e-kafka:29092
+      - REDIS_HOST=e2e-redis
+    command: ["python", "consumer.py"]
+    volumes:
+      - e2e-model-cache:/root/.cache/huggingface
+    restart: on-failure
+    profiles: ["e2e"]
+
+  e2e-api:
+    build: ./api-gateway
+    container_name: medixa-e2e-api
+    depends_on:
+      - e2e-redis
+      - e2e-ml
+      - e2e-genai
+    env_file: .env
+    environment:
+      - REDIS_HOST=e2e-redis
+      - ML_SERVICE_URL=http://e2e-ml:8001
+      - GENAI_SERVICE_URL=http://e2e-genai:8002
+    restart: on-failure
+    profiles: ["e2e"]
+
+  e2e-frontend:
+    build: ./frontend
+    container_name: medixa-e2e-frontend
+    depends_on:
+      - e2e-api
+    environment:
+      - VITE_API_URL=http://e2e-api:8000
+    profiles: ["e2e"]
+
+  # ── Playwright E2E runner ──────────────────────────────────────────────────
+  e2e-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    container_name: medixa-e2e-runner
+    depends_on:
+      - e2e-frontend
+      - e2e-api
+    volumes:
+      - ./tests/results:/app/tests/results
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-placeholder}
+      - PLAYWRIGHT_BASE_URL=http://e2e-frontend:80
+    # Wait for frontend to be ready, then run E2E tests
+    command: >
+      sh -c "
+        echo 'Waiting for frontend...' &&
+        until curl -sf http://e2e-frontend:80 > /dev/null; do sleep 2; done &&
+        echo 'Frontend ready. Running E2E tests...' &&
+        pytest tests/e2e/
+        -v --tb=short
+        -c tests/pytest.ini
+        --html=tests/results/e2e-report.html --self-contained-html
+      "
+    profiles: ["e2e"]
+
+volumes:
+  e2e-ml-model:
+  e2e-chroma:
+  e2e-model-cache:
